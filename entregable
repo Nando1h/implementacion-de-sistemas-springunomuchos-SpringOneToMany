@@ -1,0 +1,59 @@
+ENTREGABLE - Laboratorio Spring OneToMany
+
+1. ¿En qué tabla queda la llave foránea y qué propiedad de Java la controla?
+
+La llave foránea queda en la tabla de los "muchos", es decir, en la tabla
+`comentarios`. La propiedad de Java que la controla es `Comment.producto`
+(anotada con @ManyToOne). Esa es la propiedad "propietaria" de la relación
+(lado dueño). La anotación `mappedBy = "producto"` en `Product.comentarios`
+indica que el lado inverso es `Product`, y que el valor se administra desde
+la propiedad `producto` de la clase `Comment`. Hibernate suele nombrar la
+columna `producto_id`.
+
+2. ¿Cuál es la diferencia entre List y Set?
+
+- `List` conserva el orden de inserción y permite elementos repetidos.
+- `Set` no garantiza orden y está pensado para no repetir elementos, según
+  cómo se implementen `equals()` y `hashCode()`.
+En este proyecto `Product` usa `Set<Comment>` para la colección de
+comentarios, lo que evita duplicados a nivel de objeto (aunque hay que
+tener cuidado con cómo se implementan equals/hashCode en entidades).
+
+3. ¿Por qué los identificadores son String y qué tipo de valor guardan?
+
+Porque se generan con `@GeneratedValue(strategy = GenerationType.UUID)`.
+Ese tipo de generación produce un UUID (Identificador Único Universal), y
+como se almacena en un campo `String`, lo que guardan es la representación
+en texto del UUID (por ejemplo: "550e8400-e29b-41d4-a716-446655440000").
+No es un número autoincremental, sino un identificador único en formato
+texto.
+
+4. ¿Qué ocurre al eliminar un producto con comentarios asociados? ¿Qué cambia si se quita CascadeType.ALL?
+
+En `Product.comentarios` está configurado `cascade = CascadeType.ALL`, lo
+que significa que las operaciones de JPA (persistir, merge, remove, refresh,
+detach) se propagan desde `Product` hacia sus `Comment`. Por lo tanto, al
+eliminar un producto mediante JPA, la operación de borrado también se
+propaga a sus comentarios: se eliminan primero los comentarios y luego el
+producto (o en la misma transacción).
+Si se quita `CascadeType.ALL`, al borrar el producto JPA no intentará
+borrar los comentarios automáticamente. Dependiendo de la configuración de
+la base de datos (por ejemplo, si hay una restricción de llave foránea),
+podría lanzar un error de integridad referencial, o bien dejar los
+comentarios "huérfanos" apuntando a un producto que ya no existe (según
+cómo esté definida la FK). Lo importante es que el borrado en cascada ya no
+sería automático desde JPA.
+
+5. ¿Qué diferencia práctica hay entre los FetchType usados en Product y Comment?
+
+- En `Product.comentarios` se usa `FetchType.EAGER`: al cargar un producto,
+  JPA trae también sus comentarios de forma inmediata. Esto es cómodo para
+  la API (al consultar un producto se devuelven sus comentarios), pero puede
+  traer más datos de los necesarios y afectar el rendimiento.
+- En `Comment.producto` se usa `FetchType.LAZY`: al cargar un comentario, el
+  producto asociado no se trae hasta que se accede a la propiedad
+  `producto`. Esto ahorra datos, pero hay que tener cuidado porque si la
+  sesión de persistencia ya se cerró, acceder a esa relación puede fallar
+  (LazyInitializationException). En este proyecto, como se configura
+  `spring.jpa.open-in-view=false`, es especialmente importante entender
+  cuándo se accede a la relación.
